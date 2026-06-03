@@ -1,0 +1,15 @@
+[Unit]
+Description=SmokeWatch — Monitor de Qualidade do Ar
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/smokewatch/pi
+ExecStart=/usr/bin/python3 /home/pi/smokewatch/pi/main.py
+Restart=no
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

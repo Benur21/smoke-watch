@@ -1,0 +1,16 @@
+[Unit]
+Description=SmokeWatch data logger and web UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rubjorper/Desktop/sensor-qualidade-ar/pi
+ExecStart=/usr/bin/python3 /home/rubjorper/Desktop/sensor-qualidade-ar/pi/main.py
+Restart=no
+User=root
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

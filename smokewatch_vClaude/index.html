@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmokeWatch</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #333;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #1a1a2e;
+    }
+    #status {
+      font-size: 0.82rem;
+      color: #666;
+      margin-bottom: 16px;
+      height: 1.2em;
+    }
+    #chart {
+      width: 100%;
+      height: calc(100vh - 110px);
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>SmokeWatch — Qualidade do Ar</h1>
+  <div id="status">A carregar dados...</div>
+  <div id="chart"></div>
+
+  <script>
+    let lastSize = null;
+    const REFRESH_MS = 5 * 60 * 1000;  // 5 minutos
+
+    // ── constrói os traces Plotly com segmentos azul/vermelho ──────────────
+    function buildTraces(records) {
+      if (records.length === 0) return [];
+
+      const segments = [];
+      let cur = null;
+
+      for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const ts = new Date(r.ts);
+
+        if (cur === null || r.do !== cur.doVal) {
+          if (cur !== null) {
+            // Conecta ao próximo segmento (partilha o ponto de transição)
+            cur.x.push(ts);
+            cur.y.push(r.ao);
+            segments.push(cur);
+          }
+          cur = { doVal: r.do, x: [ts], y: [r.ao] };
+        } else {
+          cur.x.push(ts);
+          cur.y.push(r.ao);
+        }
+      }
+      if (cur !== null) segments.push(cur);
+
+      // Para a legenda: mostra apenas um elemento por valor de DO
+      const seenDO = {};
+      return segments.map(seg => {
+        const isSmoke = seg.doVal === 1;
+        const show = !seenDO[seg.doVal];
+        seenDO[seg.doVal] = true;
+        return {
+          x: seg.x,
+          y: seg.y,
+          mode: 'lines',
+          type: 'scatter',
+          line: { color: isSmoke ? '#e74c3c' : '#4a90d9', width: 1.5 },
+          name: isSmoke ? 'Fumo detetado (DO=1)' : 'Ar limpo (DO=0)',
+          legendgroup: isSmoke ? 'smoke' : 'clean',
+          showlegend: show,
+          hovertemplate: '<b>%{x|%d/%m/%Y %H:%M:%S}</b><br>AO: %{y}<extra></extra>',
+        };
+      });
+    }
+
+    // ── renderiza o gráfico ────────────────────────────────────────────────
+    function renderChart(records) {
+      const traces = buildTraces(records);
+
+      const layout = {
+        paper_bgcolor: '#fff',
+        plot_bgcolor:  '#f7f9fc',
+        font: { family: '-apple-system, sans-serif', color: '#333', size: 12 },
+        xaxis: {
+          title: { text: 'Data / Hora', standoff: 12 },
+          gridcolor: '#e0e6ed',
+          tickformat: '%d/%m/%y %H:%M',
+          type: 'date',
+        },
+        yaxis: {
+          title: { text: 'Valor AO (0 – 1023)', standoff: 12 },
+          gridcolor: '#e0e6ed',
+          range: [0, 1023],
+          fixedrange: false,
+        },
+        legend: {
+          bgcolor: '#f0f4f8',
+          bordercolor: '#d0d8e0',
+          borderwidth: 1,
+          x: 0.01, y: 0.99,
+          xanchor: 'left', yanchor: 'top',
+        },
+        margin: { l: 70, r: 24, t: 16, b: 60 },
+        hovermode: 'x unified',
+      };
+
+      Plotly.react('chart', traces, layout, { responsive: true });
+    }
+
+    // ── fetch e render completos ───────────────────────────────────────────
+    async function fetchAndRender() {
+      try {
+        const res = await fetch('/data');
+        const records = await res.json();
+        renderChart(records);
+        const n = records.length;
+        const now = new Date().toLocaleString('pt-PT');
+        document.getElementById('status').textContent =
+          `${n.toLocaleString()} leituras · atualizado às ${now} · próxima verificação em 5 min`;
+      } catch (e) {
+        document.getElementById('status').textContent = `Erro ao carregar dados: ${e}`;
+      }
+    }
+
+    // ── verifica se o ficheiro cresceu antes de recarregar ─────────────────
+    async function checkAndUpdate() {
+      try {
+        const res  = await fetch('/size');
+        const { size } = await res.json();
+        if (size !== lastSize) {
+          lastSize = size;
+          await fetchAndRender();
+        } else {
+          const now = new Date().toLocaleString('pt-PT');
+          // Atualiza só o timestamp sem recarregar dados
+          const el = document.getElementById('status');
+          el.textContent = el.textContent.replace(
+            /verificação em .*/,
+            `verificação às ${new Date(Date.now() + REFRESH_MS).toLocaleTimeString('pt-PT')}`
+          );
+        }
+      } catch (e) {
+        console.warn('Erro ao verificar tamanho:', e);
+      }
+    }
+
+    // ── arranque ───────────────────────────────────────────────────────────
+    (async () => {
+      try {
+        const res = await fetch('/size');
+        const { size } = await res.json();
+        lastSize = size;
+      } catch (_) {}
+      await fetchAndRender();
+      setInterval(checkAndUpdate, REFRESH_MS);
+    })();
+  </script>
+</body>
+</html>
