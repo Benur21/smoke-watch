@@ -61,14 +61,17 @@ python3 setup_smokewatch.py
 O script pergunta se queres usar a versão `Claude` ou `Copilot` e depois faz o resto automaticamente:
 
 - reescreve o `smokewatch.service` da variante escolhida com o caminho absoluto correto do clone no Raspberry Pi;
-- instala as dependências indicadas no README local dessa variante;
 - copia a unit para `/etc/systemd/system/smokewatch.service`;
 - faz `daemon-reload`, `enable` e `start` do serviço.
 
-Os comandos usados por trás seguem os READMEs locais:
+Se quiseres registar as versões atuais das dependências, faz isso manualmente na shell. Exemplo:
 
-- `smokewatch_vCopilot/` - `python3 -m pip install -r requirements.txt`
-- `smokewatch_vClaude/` - `pip3 install flask pyserial`
+```bash
+cd smokewatch_vCopilot
+python3 -m pip freeze | grep -E '^(Flask|pyserial)==' > requirements.txt
+```
+
+O `requirements.txt` fica apenas como registo de versões e não é usado pelo bootstrapper para instalar nada.
 
 Se precisares de mudar a porta série depois, continua a ajustar `SMOKEWATCH_SERIAL_PORT` na versão Copilot ou `config.py` na versão Claude.
 

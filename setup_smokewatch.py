@@ -23,7 +23,6 @@ class Variant:
     label: str
     root: Path
     service_template: Path
-    install_command: list[str]
     systemd_unit_name: str
 
 
@@ -33,7 +32,6 @@ VARIANTS = {
         label="Claude",
         root=REPO_ROOT / "smokewatch_vClaude",
         service_template=REPO_ROOT / "smokewatch_vClaude" / "smokewatch.service",
-        install_command=["pip3", "install", "flask", "pyserial"],
         systemd_unit_name="smokewatch",
     ),
     "copilot": Variant(
@@ -41,7 +39,6 @@ VARIANTS = {
         label="Copilot",
         root=REPO_ROOT / "smokewatch_vCopilot",
         service_template=REPO_ROOT / "smokewatch_vCopilot" / "pi" / "smokewatch.service",
-        install_command=["python3", "-m", "pip", "install", "-r", "requirements.txt"],
         systemd_unit_name="smokewatch.service",
     ),
 }
@@ -116,9 +113,6 @@ def main() -> int:
     if not main_entrypoint.exists():
         print(f"Entrada principal nao encontrada: {main_entrypoint}", file=sys.stderr)
         return 1
-    if variant.key == "copilot" and not (variant.root / "requirements.txt").exists():
-        print(f"requirements.txt nao encontrado em: {variant.root}", file=sys.stderr)
-        return 1
 
     rendered_service = render_service(variant.service_template, working_directory)
     temp_service = write_temp_service(rendered_service)
@@ -132,8 +126,6 @@ def main() -> int:
         print(f"ExecStart: /usr/bin/python3 {main_entrypoint}")
         print()
 
-        run_command(variant.install_command, cwd=variant.root)
-        print()
         run_command(prefix + ["cp", str(temp_service), str(SYSTEMD_TARGET)])
         run_command(prefix + ["systemctl", "daemon-reload"])
         run_command(prefix + ["systemctl", "enable", variant.systemd_unit_name])
