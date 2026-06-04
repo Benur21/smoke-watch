@@ -10,6 +10,7 @@ Este repositório contém duas implementações independentes do mesmo projeto:
   <img src="assets/copilot-dashboard.png" alt="Painel SmokeWatch vCopilot" width="900" />
 - `smokewatch_vClaude/` - versão anterior com estrutura plana e o mesmo fluxo principal.
   <img src="assets/claude-dashboard.png" alt="Painel SmokeWatch vClaude" width="900" />
+- `setup_smokewatch.py` - script na raiz que pergunta a variante, ajusta o `smokewatch.service` ao caminho real do clone e arranca o serviço.
 
 Cada variante tem o seu próprio `README.md` com notas específicas.
 
@@ -49,31 +50,27 @@ Este formato compacto reduz o espaço ocupado sem perder o histórico completo.
 - `pyserial`
 - Arduino IDE para carregar o sketch
 
-## Arranque rápido
+## Instalação e arranque automatizados
 
-### `smokewatch_vCopilot`
-
-```bash
-cd smokewatch_vCopilot
-python3 -m pip install -r requirements.txt
-python3 pi/main.py
-```
-
-Se precisares de uma porta série diferente:
+A partir da raiz do clone, executa:
 
 ```bash
-export SMOKEWATCH_SERIAL_PORT=/dev/ttyACM0
+python3 setup_smokewatch.py
 ```
 
-### `smokewatch_vClaude`
+O script pergunta se queres usar a versão `Claude` ou `Copilot` e depois faz o resto automaticamente:
 
-```bash
-cd smokewatch_vClaude
-python3 -m pip install flask pyserial
-python3 main.py
-```
+- reescreve o `smokewatch.service` da variante escolhida com o caminho absoluto correto do clone no Raspberry Pi;
+- instala as dependências indicadas no README local dessa variante;
+- copia a unit para `/etc/systemd/system/smokewatch.service`;
+- faz `daemon-reload`, `enable` e `start` do serviço.
 
-Se o Arduino não estiver em `/dev/ttyACM0`, ajusta `config.py` antes de arrancares a aplicação.
+Os comandos usados por trás seguem os READMEs locais:
+
+- `smokewatch_vCopilot/` - `python3 -m pip install -r requirements.txt`
+- `smokewatch_vClaude/` - `pip3 install flask pyserial`
+
+Se precisares de mudar a porta série depois, continua a ajustar `SMOKEWATCH_SERIAL_PORT` na versão Copilot ou `config.py` na versão Claude.
 
 ## Painel web
 
@@ -91,19 +88,6 @@ Para descobrir o IP do Pi:
 
 ```bash
 hostname -I
-```
-
-## systemd
-
-Cada variante inclui uma unidade `smokewatch.service`. Antes de a ativares, atualiza os caminhos rígidos de `WorkingDirectory` e `ExecStart` para corresponderem ao local do checkout.
-
-Exemplo para a estrutura `smokewatch_vCopilot`:
-
-```bash
-sudo cp smokewatch_vCopilot/pi/smokewatch.service /etc/systemd/system/smokewatch.service
-sudo systemctl daemon-reload
-sudo systemctl enable smokewatch.service
-sudo systemctl start smokewatch.service
 ```
 
 ## Documentação das variantes
