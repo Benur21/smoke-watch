@@ -110,3 +110,7 @@ sudo systemctl start smokewatch.service
 
 - [smokewatch_vCopilot/README.md](smokewatch_vCopilot/README.md)
 - [smokewatch_vClaude/README.md](smokewatch_vClaude/README.md)
+
+##
+
+Este README.md foi escrito por Codex.
