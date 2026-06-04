@@ -1,6 +1,6 @@
 # SmokeWatch
 
-SmokeWatch é uma pilha local de monitorização da qualidade do ar baseada num Arduino UNO, num sensor MQ-135 e num Raspberry Pi. O Arduino lê o sensor a cada segundo e envia leituras `AO,DO` por série. O Pi assinala essas leituras com um carimbo temporal, guarda-as em RAM, escreve-as em `data.bin` como registos compactos de 75 bits e publica um painel histórico no navegador da rede local.
+SmokeWatch é um sistema local de monitorização da qualidade do ar com Arduino UNO, sensor MQ-135 e Raspberry Pi. O Arduino lê o sensor a cada segundo e envia leituras `AO,DO` pela porta série. O Pi adiciona um carimbo temporal, guarda as leituras em RAM, escreve-as em `data.bin` como registos compactos de 75 bits e publica um painel histórico no navegador da rede local.
 
 ## Estrutura do repositório
 
@@ -29,7 +29,7 @@ O sketch do Arduino também espelha `DO` no LED embutido do pino `13`.
 
 1. O Arduino lê as saídas analógica e digital do sensor e envia-as a `9600` baud.
 2. O Pi lê cada linha série, valida os valores e adiciona um timestamp em milissegundos.
-3. A tarefa de descarga mantém as leituras em RAM e acrescenta-as a `data.bin` em lotes de 300 registos.
+3. A tarefa de gravação mantém as leituras em RAM e acrescenta-as a `data.bin` em lotes de 300 registos.
 4. A aplicação Flask expõe um painel em `/` e dados JSON em `/data` para a interface do navegador.
 5. O LED ACT do Pi fica aceso enquanto a ligação série estiver saudável.
 
@@ -58,10 +58,10 @@ A partir da raiz do clone, executa:
 python3 setup_smokewatch.py
 ```
 
-O script pergunta se queres usar a versão `Claude` ou `Copilot` e depois faz o resto automaticamente:
+O script pergunta se queres usar a versão `Claude` ou `Copilot` e depois:
 
 - reescreve o `smokewatch.service` da variante escolhida com o caminho absoluto correto do clone no Raspberry Pi;
-- copia a unit para `/etc/systemd/system/smokewatch.service`;
+- copia o ficheiro de serviço para `/etc/systemd/system/smokewatch.service`;
 - faz `daemon-reload`, `enable` e `start` do serviço.
 
 Se quiseres registar as versões atuais das dependências, faz isso manualmente na shell. Exemplo:
@@ -71,7 +71,7 @@ cd smokewatch_vCopilot
 python3 -m pip freeze | grep -E '^(Flask|pyserial)==' > requirements.txt
 ```
 
-O `requirements.txt` fica apenas como registo de versões e não é usado pelo bootstrapper para instalar nada.
+Na versão `Claude`, usa o mesmo comando a partir de `smokewatch_vClaude/` se quiseres criar o respetivo `requirements.txt`. Estes ficheiros ficam apenas como registo de versões e não são usados pelo bootstrapper para instalar nada.
 
 Se precisares de mudar a porta série depois, continua a ajustar `SMOKEWATCH_SERIAL_PORT` na versão Copilot ou `config.py` na versão Claude.
 
@@ -97,7 +97,3 @@ hostname -I
 
 - [smokewatch_vCopilot/README.md](smokewatch_vCopilot/README.md)
 - [smokewatch_vClaude/README.md](smokewatch_vClaude/README.md)
-
-##
-
-Este README.md foi escrito por Codex.
