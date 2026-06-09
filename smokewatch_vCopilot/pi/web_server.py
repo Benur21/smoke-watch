@@ -55,29 +55,33 @@ def create_app(data_path: str | Path, file_lock: Lock, template_folder: str | Pa
         num_records = (len(raw) * 8) // 75
         records = []
 
-        if raw and start_ms is None and end_ms is None and num_records > max_points:
-            # Avoid decoding the entire file when requesting only a sampled subset of the full range.
-            indices = [int(i * num_records / max_points) for i in range(max_points)]
-            if indices and indices[-1] != num_records - 1:
-                indices[-1] = num_records - 1
+        if raw and num_records > 0:
+            # Use direct binary access to sample records efficiently
+            if start_ms is None and end_ms is None and num_records > max_points:
+                # Full range: uniform sampling
+                indices = [int(i * num_records / max_points) for i in range(max_points)]
+                if indices and indices[-1] != num_records - 1:
+                    indices[-1] = num_records - 1
+            else:
+                # Either filtered by time or requesting all points
+                # Sample densely to ensure good coverage of the requested time range
+                # Use a large multiplier for time-filtered queries (sample ~50-75% of records)
+                multiplier = 1000 if (start_ms or end_ms) else 10
+                sample_size = min(num_records, max_points * multiplier)
+                indices = [int(i * num_records / sample_size) for i in range(sample_size)]
+                if indices and indices[-1] != num_records - 1:
+                    indices[-1] = num_records - 1
+            
+            # Read sampled records and filter by time if needed
             for idx in indices:
                 record = read_record_at_bytes(raw, idx)
                 if record is not None:
-                    records.append(record)
-        else:
-            with file_lock:
-                records = read_records(data_path)
-
-            if start_ms is not None or end_ms is not None:
-                filtered_records = []
-                for record in records:
                     timestamp_ms = record[0]
                     if start_ms is not None and timestamp_ms < start_ms:
                         continue
                     if end_ms is not None and timestamp_ms > end_ms:
                         continue
-                    filtered_records.append(record)
-                records = filtered_records
+                    records.append(record)
 
         timestamps = []
         ao_values = []

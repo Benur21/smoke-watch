@@ -150,21 +150,12 @@
           url += `&start=${interval.start}&end=${interval.end}`;
         }
 
-        const intervalKey = formatInterval(interval?.start, interval?.end);
-        
-        // Evitar pedidos duplicados
-        if (lastRequestedInterval === intervalKey && allData) {
-          statusEl.textContent = `Registos: ${allData.record_count} | Tamanho do ficheiro: ${allData.file_size} bytes | Atualizado: ${allData.updated_at}`;
-          return;
-        }
-
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = await response.json();
         allData = payload;
-        lastRequestedInterval = intervalKey;
 
         statusEl.textContent = `Registos: ${payload.record_count} (${payload.returned_points} mostrados) | Tamanho do ficheiro: ${payload.file_size} bytes | Atualizado: ${payload.updated_at}`;
 
