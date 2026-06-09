@@ -108,6 +108,43 @@ def read_records(data_path: str | Path, lock=None) -> List[Record]:
     return _read_records(data_path)
 
 
+def get_num_records(data_path: str | Path) -> int:
+    data_path = Path(data_path)
+    if not data_path.exists():
+        return 0
+    total_bits = data_path.stat().st_size * 8
+    return total_bits // RECORD_BITS
+
+
+def read_record_at(data_path: str | Path, index: int) -> Record | None:
+    data_path = Path(data_path)
+    if not data_path.exists():
+        return None
+    raw = data_path.read_bytes()
+    return read_record_at_bytes(raw, index)
+
+
+def read_record_at_bytes(raw: bytes, index: int) -> Record | None:
+    total_bits = len(raw) * 8
+    num_records = total_bits // RECORD_BITS
+    if index < 0 or index >= num_records:
+        return None
+
+    start_bit = index * RECORD_BITS
+    end_bit = start_bit + RECORD_BITS
+    start_byte = start_bit // 8
+    end_byte = (end_bit + 7) // 8
+    chunk = raw[start_byte:end_byte]
+    if not chunk:
+        return None
+
+    chunk_bits = int.from_bytes(chunk, byteorder="big")
+    chunk_bits_len = len(chunk) * 8
+    shift = chunk_bits_len - (start_bit % 8) - RECORD_BITS
+    record_value = (chunk_bits >> shift) & ((1 << RECORD_BITS) - 1)
+    return decode_record(record_value)
+
+
 def _read_records(data_path: str | Path) -> List[Record]:
     data_path = Path(data_path)
     if not data_path.exists():

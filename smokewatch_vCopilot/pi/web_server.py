@@ -4,9 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 
-from bitstream import read_records
-from flask import Flask, jsonify, render_template
-from flask import request
+from bitstream import get_num_records, read_record_at_bytes, read_records
+from flask import Flask, jsonify, render_template, request
 
 
 def create_app(data_path: str | Path, file_lock: Lock, template_folder: str | Path) -> Flask:
@@ -51,21 +50,34 @@ def create_app(data_path: str | Path, file_lock: Lock, template_folder: str | Pa
             max_points = DEFAULT_MAX_POINTS
 
         with file_lock:
-            records = read_records(data_path)
+            raw = data_path.read_bytes() if data_path.exists() else b''
 
-        # Filter by time interval if requested
-        if start_ms is not None or end_ms is not None:
-            filtered_records = []
-            for record in records:
-                timestamp_ms = record[0]
-                if start_ms is not None and timestamp_ms < start_ms:
-                    continue
-                if end_ms is not None and timestamp_ms > end_ms:
-                    continue
-                filtered_records.append(record)
-            records = filtered_records
+        num_records = (len(raw) * 8) // 75
+        records = []
 
-        # Validate records
+        if raw and start_ms is None and end_ms is None and num_records > max_points:
+            # Avoid decoding the entire file when requesting only a sampled subset of the full range.
+            indices = [int(i * num_records / max_points) for i in range(max_points)]
+            if indices and indices[-1] != num_records - 1:
+                indices[-1] = num_records - 1
+            for idx in indices:
+                record = read_record_at_bytes(raw, idx)
+                if record is not None:
+                    records.append(record)
+        else:
+            with file_lock:
+                records = read_records(data_path)
+
+            if start_ms is not None or end_ms is not None:
+                filtered_records = []
+                for record in records:
+                    timestamp_ms = record[0]
+                    if start_ms is not None and timestamp_ms < start_ms:
+                        continue
+                    if end_ms is not None and timestamp_ms > end_ms:
+                        continue
+                    filtered_records.append(record)
+                records = filtered_records
 
         timestamps = []
         ao_values = []
@@ -79,13 +91,13 @@ def create_app(data_path: str | Path, file_lock: Lock, template_folder: str | Pa
             if not (1_000_000_000_000 <= timestamp_ms <= now_ms + 60_000):
                 continue
             try:
-                dt = datetime.fromtimestamp(timestamp_ms / 1000.0)
+                datetime.fromtimestamp(timestamp_ms / 1000.0)
             except (OverflowError, OSError, ValueError):
                 continue
             validated_records.append((timestamp_ms, ao_value, do_value))
             valid_records += 1
 
-        # Apply downsampling
+        # Apply downsampling if requested on a filtered interval or after validation.
         downsampled = _downsample_records(validated_records, max_points)
 
         # Build response
