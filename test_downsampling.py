@@ -27,10 +27,10 @@ def test_downsampling():
         temp_data_path = Path(f.name)
     
     try:
-        # Create test records: 1000 points spread over time
+        # Create test records: more points than the default max_points
         test_records = []
         base_time = 1718000000000  # Some timestamp in milliseconds
-        for i in range(1000):
+        for i in range(1500):
             timestamp_ms = base_time + (i * 1000)  # 1 second apart
             ao_value = (500 + i % 500)  # Varying values 500-999
             do_value = i % 2  # Alternating 0 and 1
@@ -47,12 +47,13 @@ def test_downsampling():
         # Test with Flask test client
         with app.test_client() as client:
             # Test 1: Get all data with max_points=100
-            print("\nTest 1: Requesting max_points=100 for 1000 records...")
+            print("\nTest 1: Requesting max_points=100 for 1500 records...")
             resp = client.get('/data?max_points=100')
             data = resp.get_json()
             print(f"  Returned {len(data['timestamps'])} points out of {data['record_count']} total")
             print(f"  Expected: ~100, Got: {len(data['timestamps'])}")
-            assert len(data['timestamps']) <= 101, "Should have at most 101 points (allowing for last point guarantee)"
+            assert data['record_count'] == 1500, "Should report total complete records in the file"
+            assert len(data['timestamps']) <= 100, "Should have at most 100 points"
             print("  ✓ Pass")
             
             # Test 2: Get all data without max_points (should default to 1000)
@@ -60,7 +61,8 @@ def test_downsampling():
             resp = client.get('/data')
             data = resp.get_json()
             print(f"  Returned {len(data['timestamps'])} points")
-            assert data['record_count'] == 1000, "Should have 1000 records"
+            assert data['record_count'] == 1500, "Should report 1500 total records"
+            assert len(data['timestamps']) <= 1000, "Should use default max_points"
             print("  ✓ Pass")
             
             # Test 3: Request with time interval
@@ -71,13 +73,15 @@ def test_downsampling():
             data = resp.get_json()
             print(f"  Returned {len(data['timestamps'])} points in interval")
             assert len(data['timestamps']) > 0, "Should have returned some points"
+            assert len(data['timestamps']) <= 50, "Should have at most 50 points"
+            assert data['filtered_record_count'] == 101, "Should count records in the selected interval"
             print("  ✓ Pass")
             
             # Test 4: Check response structure
             print("\nTest 4: Checking response structure...")
             resp = client.get('/data?max_points=100')
             data = resp.get_json()
-            required_keys = {'timestamps', 'ao_values', 'do_values', 'record_count', 'returned_points', 'file_size', 'updated_at'}
+            required_keys = {'timestamps', 'ao_values', 'do_values', 'record_count', 'filtered_record_count', 'returned_points', 'file_size', 'updated_at'}
             assert all(k in data for k in required_keys), f"Missing keys. Got: {set(data.keys())}"
             print(f"  Response keys: {set(data.keys())}")
             print("  ✓ Pass")

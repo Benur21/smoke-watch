@@ -53,8 +53,9 @@
     // ====================
     const statusEl = document.getElementById('status');
     const plotEl = document.getElementById('plot');
-    let lastRequestedInterval = null;
+    let activeInterval = null;
     let allData = null;
+    let plotEventsAttached = false;
 
     // ====================
     // Funções Auxiliares
@@ -116,11 +117,21 @@
       ];
     }
 
-    function formatInterval(start, end) {
-      if (!start || !end) {
+    function normalizeInterval(start, end) {
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        return null;
+      }
+      if (start > end) {
+        return { start: end, end: start };
+      }
+      return { start, end };
+    }
+
+    function formatInterval(interval) {
+      if (!interval) {
         return 'all';
       }
-      return `${Math.round(start)}_${Math.round(end)}`;
+      return `${Math.round(interval.start)}_${Math.round(interval.end)}`;
     }
 
     function getVisibleInterval() {
@@ -134,20 +145,62 @@
       }
       const start = new Date(xaxis.range[0]).getTime();
       const end = new Date(xaxis.range[1]).getTime();
-      return { start, end };
+      return normalizeInterval(start, end);
+    }
+
+    function getIntervalFromRelayout(eventdata) {
+      if (!eventdata) {
+        return getVisibleInterval();
+      }
+      if (eventdata['xaxis.autorange']) {
+        return null;
+      }
+      if (Array.isArray(eventdata['xaxis.range'])) {
+        return normalizeInterval(
+          new Date(eventdata['xaxis.range'][0]).getTime(),
+          new Date(eventdata['xaxis.range'][1]).getTime(),
+        );
+      }
+      if (eventdata['xaxis.range[0]'] !== undefined && eventdata['xaxis.range[1]'] !== undefined) {
+        return normalizeInterval(
+          new Date(eventdata['xaxis.range[0]']).getTime(),
+          new Date(eventdata['xaxis.range[1]']).getTime(),
+        );
+      }
+      return getVisibleInterval();
+    }
+
+    function relayoutTouchesXaxis(eventdata) {
+      if (!eventdata) {
+        return true;
+      }
+      return Object.keys(eventdata).some((key) => (
+        key === 'xaxis.autorange' ||
+        key === 'xaxis.range' ||
+        key.startsWith('xaxis.range[')
+      ));
+    }
+
+    function attachPlotEvents() {
+      if (plotEventsAttached || typeof plotEl.on !== 'function') {
+        return;
+      }
+      plotEl.on('plotly_relayout', _scheduleRefreshOnRelayout);
+      plotEventsAttached = true;
     }
 
     // ====================
     // Refresh de Dados
     // ====================
-    async function refreshData() {
+    async function refreshData(interval) {
+      const requestedInterval = arguments.length > 0 ? interval : activeInterval;
+      activeInterval = requestedInterval;
       statusEl.textContent = 'A actualizar...';
       try {
-        const interval = getVisibleInterval();
         let url = `/data?max_points=${MAX_POINTS_DEFAULT}`;
 
-        if (interval) {
-          url += `&start=${interval.start}&end=${interval.end}`;
+        if (requestedInterval) {
+          url += `&start=${Math.round(requestedInterval.start)}&end=${Math.round(requestedInterval.end)}`;
         }
 
         const response = await fetch(url);
@@ -173,7 +226,8 @@
             yaxis: { title: 'AO value', range: [0, 1023] },
             legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 },
           };
-          Plotly.newPlot(plotEl, series, layout, { responsive: true });
+          await Plotly.newPlot(plotEl, series, layout, { responsive: true });
+          attachPlotEvents();
         }
       } catch (error) {
         statusEl.textContent = `Erro ao carregar dados: ${error.message}`;
@@ -186,17 +240,18 @@
     refreshData();
     setInterval(refreshData, REFRESH_INTERVAL_MS);
 
-    // Listen for zoom/pan events (attach via both DOM and Plotly APIs)
+    // Listen for zoom/pan events after Plotly initializes the graph div.
     function _scheduleRefreshOnRelayout(eventdata) {
+      if (!relayoutTouchesXaxis(eventdata)) {
+        return;
+      }
+      const nextInterval = getIntervalFromRelayout(eventdata);
+      if (formatInterval(nextInterval) === formatInterval(activeInterval)) {
+        return;
+      }
+      activeInterval = nextInterval;
       if (plotEl._relayoutTimeout) clearTimeout(plotEl._relayoutTimeout);
-      plotEl._relayoutTimeout = setTimeout(() => { refreshData(); }, 150);
-    }
-
-    if (plotEl.addEventListener) {
-      plotEl.addEventListener('plotly_relayout', _scheduleRefreshOnRelayout);
-    }
-    if (typeof Plotly !== 'undefined' && typeof plotEl.on === 'function') {
-      plotEl.on('plotly_relayout', _scheduleRefreshOnRelayout);
+      plotEl._relayoutTimeout = setTimeout(() => { refreshData(nextInterval); }, 150);
     }
   </script>
 </body>
