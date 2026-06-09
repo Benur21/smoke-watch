@@ -195,11 +195,18 @@
     refreshData();
     setInterval(refreshData, REFRESH_INTERVAL_MS);
 
-    // Listen for zoom/pan events
-    plotEl.addEventListener('plotly_relayout', function(eventdata) {
-      // Debounce to avoid multiple reloads during drag
-      setTimeout(refreshData, 100);
-    });
+    // Listen for zoom/pan events (attach via both DOM and Plotly APIs)
+    function _scheduleRefreshOnRelayout(eventdata) {
+      if (plotEl._relayoutTimeout) clearTimeout(plotEl._relayoutTimeout);
+      plotEl._relayoutTimeout = setTimeout(() => { refreshData(); }, 150);
+    }
+
+    if (plotEl.addEventListener) {
+      plotEl.addEventListener('plotly_relayout', _scheduleRefreshOnRelayout);
+    }
+    if (typeof Plotly !== 'undefined' && typeof plotEl.on === 'function') {
+      plotEl.on('plotly_relayout', _scheduleRefreshOnRelayout);
+    }
   </script>
 </body>
 </html>
