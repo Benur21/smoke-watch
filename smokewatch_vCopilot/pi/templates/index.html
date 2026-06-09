@@ -56,6 +56,7 @@
     let activeInterval = null;
     let allData = null;
     let plotEventsAttached = false;
+    let isRefreshing = false;
 
     // ====================
     // Funções Auxiliares
@@ -189,12 +190,32 @@
       plotEventsAttached = true;
     }
 
+    function buildLayout(interval) {
+      const layout = {
+        paper_bgcolor: '#101018',
+        plot_bgcolor: '#13131f',
+        font: { color: '#f0f0f0' },
+        xaxis: { title: 'Timestamp', type: 'date' },
+        yaxis: { title: 'AO value', range: [0, 1023] },
+        legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 },
+      };
+
+      if (interval) {
+        layout.xaxis.range = [new Date(interval.start), new Date(interval.end)];
+      } else {
+        layout.xaxis.autorange = true;
+      }
+
+      return layout;
+    }
+
     // ====================
     // Refresh de Dados
     // ====================
     async function refreshData(interval) {
       const requestedInterval = arguments.length > 0 ? interval : activeInterval;
       activeInterval = requestedInterval;
+      isRefreshing = true;
       statusEl.textContent = 'A actualizar...';
       try {
         let url = `/data?max_points=${MAX_POINTS_DEFAULT}`;
@@ -213,24 +234,13 @@
         statusEl.textContent = `Registos: ${payload.record_count} (${payload.returned_points} mostrados) | Tamanho do ficheiro: ${payload.file_size} bytes | Atualizado: ${payload.updated_at}`;
 
         const series = buildSeries(payload);
-        if (plotEl.data && plotEl.data.length > 0) {
-          // Update existing plot with restyle (mantém zoom/pan)
-          Plotly.restyle(plotEl, { x: [series[0].x, series[1].x], y: [series[0].y, series[1].y], text: [series[0].text, series[1].text] });
-        } else {
-          // First load: create new plot
-          const layout = {
-            paper_bgcolor: '#101018',
-            plot_bgcolor: '#13131f',
-            font: { color: '#f0f0f0' },
-            xaxis: { title: 'Timestamp', type: 'date' },
-            yaxis: { title: 'AO value', range: [0, 1023] },
-            legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 },
-          };
-          await Plotly.newPlot(plotEl, series, layout, { responsive: true });
-          attachPlotEvents();
-        }
+        const layout = buildLayout(requestedInterval);
+        await Plotly.react(plotEl, series, layout, { responsive: true });
+        attachPlotEvents();
       } catch (error) {
         statusEl.textContent = `Erro ao carregar dados: ${error.message}`;
+      } finally {
+        isRefreshing = false;
       }
     }
 
@@ -242,6 +252,9 @@
 
     // Listen for zoom/pan events after Plotly initializes the graph div.
     function _scheduleRefreshOnRelayout(eventdata) {
+      if (isRefreshing) {
+        return;
+      }
       if (!relayoutTouchesXaxis(eventdata)) {
         return;
       }
