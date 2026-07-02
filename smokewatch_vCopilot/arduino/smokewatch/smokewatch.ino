@@ -13,7 +13,7 @@ void loop() {
   int aoValue = analogRead(ANALOG_PIN);
   int doValue = digitalRead(DIGITAL_PIN);
 
-  digitalWrite(LED_PIN, doValue ? HIGH : LOW);
+  digitalWrite(LED_PIN, doValue ? LOW : HIGH);
 
   Serial.print(aoValue);
   Serial.print(',');
