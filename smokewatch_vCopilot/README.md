@@ -50,6 +50,25 @@ python3 main.py
 - `SMOKEWATCH_NTFY_SERVER` - servidor `ntfy` a usar, por omissão `https://ntfy.sh`.
 - `SMOKEWATCH_NTFY_TITLE` - título mostrado na notificação.
 
+### Ficheiro `.env`
+
+O `SmokeWatch` carrega automaticamente `smokewatch_vCopilot/pi/.env` quando arranca.
+
+Exemplo:
+
+```env
+SMOKEWATCH_SERIAL_PORT=/dev/ttyACM0
+SMOKEWATCH_ALERT_THRESHOLD=120
+SMOKEWATCH_NTFY_TOPIC=meu-topico
+SMOKEWATCH_NTFY_SERVER=https://ntfy.sh
+SMOKEWATCH_NTFY_TITLE=SmokeWatch alerta
+```
+
+Formato suportado:
+- `CHAVE=valor`
+- `export CHAVE=valor`
+- linhas vazias e comentários com `#`
+
 ## systemd
 
 O ficheiro de serviço já está disponível em `pi/smokewatch.service`.

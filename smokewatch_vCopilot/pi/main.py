@@ -16,6 +16,7 @@ DEFAULT_SERIAL_PORT = "/dev/ttyACM0"
 DATA_FILE = Path(__file__).resolve().parents[1] / "data.bin"
 DEFAULT_ALERT_THRESHOLD = 120
 DEFAULT_NTFY_SERVER = "https://ntfy.sh"
+DOTENV_FILE = Path(__file__).resolve().parent / ".env"
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -29,6 +30,31 @@ def _get_env_int(name: str, default: int) -> int:
         return default
 
 
+def _load_dotenv(env_path: Path) -> None:
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key or key in os.environ:
+            continue
+
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+
+        os.environ[key] = value
+
+
 def _attempt_reader_connection(reader: SerialReader, timeout: float) -> bool:
     reader.start()
     connected = reader.connected_event.wait(timeout=timeout)
@@ -39,6 +65,8 @@ def _attempt_reader_connection(reader: SerialReader, timeout: float) -> bool:
 
 
 def main() -> int:
+    _load_dotenv(DOTENV_FILE)
+
     stop_event = Event()
     file_lock = Lock()
     data_queue = deque()
