@@ -45,6 +45,10 @@ python3 main.py
 
 ### Variáveis de ambiente
 - `SMOKEWATCH_SERIAL_PORT` - porta série do Arduino (padrão `/dev/ttyACM0`).
+- `SMOKEWATCH_ALERT_THRESHOLD` - limiar do valor AO que dispara a notificação no telefone (padrão `120`).
+- `SMOKEWATCH_NTFY_TOPIC` - tópico do `ntfy.sh` para onde o alerta é enviado. Se estiver vazio, as notificações ficam desativadas.
+- `SMOKEWATCH_NTFY_SERVER` - servidor `ntfy` a usar, por omissão `https://ntfy.sh`.
+- `SMOKEWATCH_NTFY_TITLE` - título mostrado na notificação.
 
 ## systemd
 

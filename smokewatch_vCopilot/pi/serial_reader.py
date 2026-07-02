@@ -6,6 +6,8 @@ from pathlib import Path
 import serial
 from serial import SerialException
 
+from ntfy_client import NtfyNotifier
+
 
 class PiLedController:
     def __init__(self) -> None:
@@ -43,6 +45,8 @@ class SerialReader(threading.Thread):
         led_controller: PiLedController,
         stop_event: threading.Event,
         connected_event: threading.Event,
+        alert_threshold: int = 120,
+        notifier: NtfyNotifier | None = None,
         baudrate: int = 9600,
     ) -> None:
         super().__init__(daemon=True)
@@ -52,8 +56,11 @@ class SerialReader(threading.Thread):
         self.led_controller = led_controller
         self.stop_event = stop_event
         self.connected_event = connected_event
+        self.alert_threshold = alert_threshold
+        self.notifier = notifier
         self.serial = None
         self._lock = threading.Lock()
+        self._alert_active = False
 
     def request_stop(self) -> None:
         self.stop_event.set()
@@ -78,6 +85,16 @@ class SerialReader(threading.Thread):
             return None
         return ao_value, do_value
 
+    def _maybe_notify(self, ao_value: int, do_value: int) -> None:
+        is_above_threshold = ao_value > self.alert_threshold
+        if is_above_threshold and not self._alert_active and self.notifier:
+            message = (
+                f"SmokeWatch: valor AO acima de {self.alert_threshold} "
+                f"(AO={ao_value}, DO={do_value})."
+            )
+            self.notifier.send(message)
+        self._alert_active = is_above_threshold
+
     def run(self) -> None:
         try:
             with serial.Serial(self.port, self.baudrate, timeout=1) as ser:
@@ -94,6 +111,7 @@ class SerialReader(threading.Thread):
 
                     ao_value, do_value = parsed
                     self.queue.append((int(time.time() * 1_000), ao_value, do_value))
+                    self._maybe_notify(ao_value, do_value)
                     self.connected_event.set()
                     start_time = time.monotonic()
 
@@ -109,6 +127,7 @@ class SerialReader(threading.Thread):
                             continue
                         ao_value, do_value = parsed
                         self.queue.append((int(time.time() * 1_000), ao_value, do_value))
+                        self._maybe_notify(ao_value, do_value)
                         start_time = time.monotonic()
         except SerialException:
             return
