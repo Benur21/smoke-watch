@@ -64,6 +64,17 @@ O script pergunta se queres usar a versão `Claude` ou `Copilot` e depois:
 - copia o ficheiro de serviço para `/etc/systemd/system/smokewatch.service`;
 - faz `daemon-reload`, `enable` e `start` do serviço.
 
+Com o serviço instalado, podes usar também:
+
+```bash
+make start
+make stop
+make restart
+make logs
+```
+
+Por omissão, estes comandos usam `smokewatch.service`. Se precisares de apontar para outra unit, passa `SERVICE=smokewatch`.
+
 Se quiseres registar as versões atuais das dependências, faz isso manualmente na shell. Exemplo:
 
 ```bash
